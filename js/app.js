@@ -1,77 +1,76 @@
 (function () {
   'use strict';
 
-  const { DRAWINGS, PHRASES, ANSWERS, INTRO } = window.LetsTalk;
+  const { PHRASES, ANSWERS, INTRO, stage, tiles, people, captions } = window.LetsTalk;
 
   const MAX_CUSTOM_LENGTH = 120;
-  const LONG_TEXT_THRESHOLD = 22;
-  const SPEECH_RATE = 0.85;
-  const SPEECH_LANG = 'nl-NL';
-  const FALLBACK_DRAWING = 'bubble';
+  const LISTENING_PLACEHOLDER = '…';
 
   const els = Object.freeze({
-    picture: document.getElementById('stage-picture'),
-    text: document.getElementById('stage-text'),
     speak: document.getElementById('speak-button'),
+    mic: document.getElementById('mic-button'),
     phrases: document.getElementById('phrase-tiles'),
+    contextAnswers: document.getElementById('context-answers'),
     answers: document.getElementById('answer-tiles'),
     form: document.getElementById('custom-form'),
     input: document.getElementById('custom-input'),
     error: document.getElementById('custom-error'),
   });
 
-  const canSpeak = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-  // Drawings are static, trusted markup from drawings.js — never user input.
-  function drawingFor(key) {
-    return DRAWINGS[key] || DRAWINGS[FALLBACK_DRAWING];
+  const captioning = captions.createCaptions({
+    onText: (text) => stage.setText(text || LISTENING_PLACEHOLDER),
+    onListeningChange: renderMicState,
+    onError: (message) => stage.show({ text: message, drawing: 'mic' }),
+  });
+
+  // Anything chosen on screen replaces live captions.
+  function stopCaptions() {
+    captioning.stop();
   }
 
-  function restartEnterAnimation(element) {
-    element.classList.remove('is-entering');
-    void element.offsetWidth; // force reflow so the animation replays
-    element.classList.add('is-entering');
-  }
-
-  function showOnStage(item) {
-    els.picture.innerHTML = drawingFor(item.drawing);
-    els.text.textContent = item.text;
-    els.text.classList.toggle('is-long', item.text.length > LONG_TEXT_THRESHOLD);
-    restartEnterAnimation(els.picture);
-  }
-
-  function markSelected(selectedButton) {
-    document.querySelectorAll('.tile[aria-pressed]').forEach((button) => {
-      button.setAttribute('aria-pressed', String(button === selectedButton));
+  function drawingTile(item, variant, onSelect) {
+    return tiles.createTile({
+      label: item.text,
+      picture: tiles.drawingPicture(item.drawing),
+      variant,
+      tone: item.tone,
+      onSelect,
     });
   }
 
-  function createTile(item, variant) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `tile tile--${variant}${item.tone ? ` tile--${item.tone}` : ''}`;
-    button.setAttribute('aria-pressed', 'false');
-
-    const picture = document.createElement('span');
-    picture.className = 'tile__picture';
-    picture.innerHTML = drawingFor(item.drawing);
-
-    const label = document.createElement('span');
-    label.className = 'tile__label';
-    label.textContent = item.text;
-
-    button.append(picture, label);
-    button.addEventListener('click', () => {
-      showOnStage(item);
-      markSelected(button);
-    });
-    return button;
+  function selectItem(item, button) {
+    stopCaptions();
+    stage.show(item);
+    tiles.markSelected(button);
   }
 
-  function renderTiles(container, items, variant) {
-    const fragment = document.createDocumentFragment();
-    items.forEach((item) => fragment.append(createTile(item, variant)));
-    container.replaceChildren(fragment);
+  function scrollIntoViewGently(element) {
+    element.scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion.matches ? 'auto' : 'smooth' });
+  }
+
+  function renderContextAnswers(phrase) {
+    const answers = phrase?.answers ?? [];
+    els.contextAnswers.hidden = answers.length === 0;
+    els.contextAnswers.replaceChildren(
+      ...answers.map((answer) => drawingTile(answer, 'answer', (button) => selectItem(answer, button))),
+    );
+    if (answers.length > 0) scrollIntoViewGently(els.contextAnswers);
+  }
+
+  function selectPhrase(phrase, button) {
+    selectItem(phrase, button);
+    renderContextAnswers(phrase);
+  }
+
+  function renderStaticTiles() {
+    els.phrases.replaceChildren(
+      ...PHRASES.map((phrase) => drawingTile(phrase, 'phrase', (button) => selectPhrase(phrase, button))),
+    );
+    els.answers.replaceChildren(
+      ...ANSWERS.map((answer) => drawingTile(answer, 'answer', (button) => selectItem(answer, button))),
+    );
   }
 
   function validateCustomText(rawValue) {
@@ -93,28 +92,43 @@
       els.input.focus();
       return;
     }
-    showOnStage({ text: result.value, drawing: FALLBACK_DRAWING });
-    markSelected(null);
+    selectItem({ text: result.value, drawing: stage.FALLBACK_DRAWING }, null);
+    renderContextAnswers(null);
     els.input.value = '';
     els.input.blur(); // hide the on-screen keyboard so the stage is visible
   }
 
-  function findDutchVoice() {
-    return window.speechSynthesis.getVoices().find((voice) => voice.lang.toLowerCase().startsWith('nl'));
+  function renderMicState(isListening) {
+    els.mic.classList.toggle('is-listening', isListening);
+    els.mic.setAttribute('aria-pressed', String(isListening));
+    els.mic.setAttribute('aria-label', isListening ? 'Ondertiteling stoppen' : 'Ondertiteling starten');
   }
 
-  function speak(text) {
-    if (!canSpeak || !text) return;
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = SPEECH_LANG;
-      utterance.rate = SPEECH_RATE;
-      const voice = findDutchVoice();
-      if (voice) utterance.voice = voice;
-      window.speechSynthesis.speak(utterance);
-    } catch (error) {
-      console.error('Voorlezen is mislukt:', error);
+  function handleMicClick() {
+    if (captioning.isListening()) {
+      stopCaptions();
+      return;
+    }
+    stage.stopSpeaking(); // otherwise the app would caption its own voice
+    tiles.markSelected(null);
+    stage.show({ text: LISTENING_PLACEHOLDER, drawing: 'mic' });
+    captioning.start();
+  }
+
+  function setUpBarButtons() {
+    if (stage.canSpeak) {
+      els.speak.addEventListener('click', () => {
+        stopCaptions();
+        stage.speak();
+      });
+    } else {
+      els.speak.hidden = true;
+    }
+
+    if (captioning.isSupported) {
+      els.mic.addEventListener('click', handleMicClick);
+    } else {
+      els.mic.hidden = true;
     }
   }
 
@@ -129,18 +143,17 @@
   }
 
   function init() {
-    renderTiles(els.phrases, PHRASES, 'phrase');
-    renderTiles(els.answers, ANSWERS, 'answer');
-    showOnStage(INTRO);
+    renderStaticTiles();
+    stage.show(INTRO);
+    setUpBarButtons();
 
     els.form.addEventListener('submit', handleCustomSubmit);
     els.input.maxLength = MAX_CUSTOM_LENGTH;
 
-    if (canSpeak) {
-      els.speak.addEventListener('click', () => speak(els.text.textContent));
-    } else {
-      els.speak.hidden = true;
-    }
+    people.init({ onBeforeSelect: () => {
+      stopCaptions();
+      renderContextAnswers(null);
+    } });
 
     document.addEventListener('pointerdown', requestWakeLock, { once: true });
     document.addEventListener('visibilitychange', requestWakeLock);

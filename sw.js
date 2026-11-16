@@ -2,11 +2,11 @@
  * Service worker: maakt de app offline bruikbaar.
  * Strategie "stale-while-revalidate": toon meteen wat in de cache zit en
  * haal op de achtergrond de nieuwste versie op voor de volgende keer.
- * Verhoog CACHE_VERSION wanneer bestanden in APP_SHELL wijzigen van naam.
+ * Verhoog CACHE_VERSION wanneer bestanden in APP_SHELL erbij komen of van naam wijzigen.
  */
 'use strict';
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_NAME = `lets-talk-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -15,7 +15,13 @@ const APP_SHELL = [
   'manifest.webmanifest',
   'css/styles.css',
   'js/drawings.js',
+  'js/drawings-answers.js',
   'js/phrases.js',
+  'js/stage.js',
+  'js/tiles.js',
+  'js/people-store.js',
+  'js/people.js',
+  'js/captions.js',
   'js/app.js',
   'js/pwa.js',
   'icons/icon.svg',

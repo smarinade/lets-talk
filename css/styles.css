@@ -11,6 +11,7 @@
   --no: #D64545;
   --unknown: #8A8F98;
   --error: #B42318;
+  --listening: #D64545;
   --radius-lg: 28px;
   --radius-md: 20px;
   --gutter: clamp(16px, 3vw, 32px);
@@ -32,7 +33,7 @@ body {
   margin: 0;
   height: 100dvh;
   display: grid;
-  grid-template-rows: minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font);
@@ -40,12 +41,11 @@ body {
   overscroll-behavior: none;
 }
 
-/* ---------- Stage: grote tekening + tekstbalk ---------- */
+/* ---------- Stage: grote tekening of foto ---------- */
 
 .stage {
   display: flex;
   flex-direction: column;
-  gap: 14px;
   min-height: 0;
   padding: var(--gutter) var(--gutter) 14px;
 }
@@ -66,7 +66,15 @@ body {
   height: 100%;
 }
 
-.stage__picture.is-entering svg {
+.stage__photo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+}
+
+.stage__picture.is-entering svg,
+.stage__picture.is-entering .stage__photo {
   animation: pop-in 320ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
 
@@ -75,17 +83,20 @@ body {
   to { opacity: 1; transform: scale(1); }
 }
 
-.stage__bar {
+/* ---------- Tekstbalk: over de volle breedte ---------- */
+
+.bar {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 14px 18px 14px 28px;
+  margin: 0 var(--gutter) 10px;
+  padding: 14px 18px;
   background: var(--bar-bg);
   color: var(--bar-text);
   border-radius: var(--radius-md);
 }
 
-.stage__text {
+.bar__text {
   flex: 1;
   margin: 0;
   min-height: 1.15em;
@@ -96,11 +107,15 @@ body {
   overflow-wrap: anywhere;
 }
 
-.stage__text.is-long {
+.bar__text.is-long {
   font-size: clamp(2rem, 5vw, 4rem);
 }
 
-.stage__speak {
+.bar__text.is-very-long {
+  font-size: clamp(1.6rem, 3.6vw, 3rem);
+}
+
+.bar__button {
   flex: none;
   width: 64px;
   height: 64px;
@@ -113,13 +128,27 @@ body {
   cursor: pointer;
 }
 
-.stage__speak svg {
+.bar__button[hidden] {
+  display: none;
+}
+
+.bar__button svg {
   width: 32px;
   height: 32px;
 }
 
-.stage__speak:active {
+.bar__button:active {
   background: rgba(255, 255, 255, 0.28);
+}
+
+.bar__button--mic.is-listening {
+  background: var(--listening);
+  animation: listening-pulse 1.6s ease-out infinite;
+}
+
+@keyframes listening-pulse {
+  from { box-shadow: 0 0 0 0 rgba(214, 69, 69, 0.6); }
+  to { box-shadow: 0 0 0 18px rgba(214, 69, 69, 0); }
 }
 
 /* ---------- Panel: keuzetegels ---------- */
@@ -144,6 +173,39 @@ body {
   margin-top: 4px;
 }
 
+.panel__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panel__action {
+  padding: 8px 14px;
+  border: 2px solid var(--accent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.panel__action[aria-pressed='true'] {
+  background: var(--accent);
+  color: #FFFFFF;
+}
+
+.panel__error {
+  margin: 8px 0 0;
+  color: var(--error);
+  font-weight: 700;
+}
+
+.panel__error:empty {
+  display: none;
+}
+
 .tiles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -152,6 +214,16 @@ body {
 
 .tiles--answers {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tiles--context {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  margin-bottom: 12px;
+  scroll-margin: 12px;
+}
+
+.tiles[hidden] {
+  display: none;
 }
 
 .tile {
@@ -182,7 +254,9 @@ body {
 }
 
 .tile:focus-visible,
-.stage__speak:focus-visible,
+.bar__button:focus-visible,
+.panel__action:focus-visible,
+.dialog__cancel:focus-visible,
 .custom__submit:focus-visible {
   outline: 4px solid var(--accent);
   outline-offset: 3px;
@@ -220,9 +294,121 @@ body {
   font-size: 1.5rem;
 }
 
+.tiles--context .tile--answer {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tiles--context .tile--answer .tile__picture {
+  width: 72px;
+  height: 72px;
+}
+
+.tiles--context .tile--answer .tile__label {
+  font-size: 1.25rem;
+}
+
+.tile__picture--photo {
+  width: 96px;
+  height: 96px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--accent-soft);
+}
+
+.tile__picture--photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tile--add {
+  border: 3px dashed #D9D2C5;
+  background: transparent;
+  box-shadow: none;
+  color: var(--accent);
+}
+
+.tile--person {
+  position: relative;
+}
+
+.tiles--people.is-editing .tile--person::after {
+  content: '×';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--no);
+  color: #FFFFFF;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.tiles--people.is-editing .tile--person {
+  border-color: var(--no);
+}
+
 .tile--yes[aria-pressed='true'] { border-color: var(--yes); background: #E1F1E6; }
 .tile--no[aria-pressed='true'] { border-color: var(--no); background: #F9E1E1; }
 .tile--unknown[aria-pressed='true'] { border-color: var(--unknown); background: #ECEDEF; }
+
+/* ---------- Venster: foto bewaren ---------- */
+
+.dialog {
+  width: min(92vw, 480px);
+  padding: 24px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+}
+
+.dialog::backdrop {
+  background: rgba(30, 42, 51, 0.55);
+}
+
+.dialog__form {
+  display: grid;
+  gap: 14px;
+}
+
+.dialog__title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.dialog__preview {
+  width: 100%;
+  max-height: 40vh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  background: var(--card);
+}
+
+.dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.dialog__cancel {
+  height: 64px;
+  padding: 0 24px;
+  border: 3px solid #D9D2C5;
+  border-radius: var(--radius-md);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+}
 
 /* ---------- Zelf typen ---------- */
 
@@ -279,20 +465,30 @@ body {
   white-space: nowrap;
 }
 
-/* Liggende tablet: tekening + balk links, keuzes rechts */
+/* Liggende tablet: tekening links, keuzes rechts, balk onderaan over de hele breedte */
 @media (orientation: landscape) and (min-width: 900px) {
   body {
-    grid-template-rows: none;
     grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'stage panel'
+      'bar bar';
   }
 
   .stage {
-    padding-bottom: var(--gutter);
+    grid-area: stage;
   }
 
   .panel {
+    grid-area: panel;
     padding-top: var(--gutter);
     padding-left: 0;
+    padding-bottom: 14px;
+  }
+
+  .bar {
+    grid-area: bar;
+    margin-bottom: calc(var(--gutter) + env(safe-area-inset-bottom));
   }
 
   .tiles {
@@ -308,16 +504,22 @@ body {
     gap: 6px;
   }
 
-  .stage__text {
+  .bar__text {
     font-size: clamp(2.2rem, 4.6vw, 5rem);
   }
 
-  .stage__text.is-long {
+  .bar__text.is-long {
     font-size: clamp(1.9rem, 3.4vw, 3.8rem);
+  }
+
+  .bar__text.is-very-long {
+    font-size: clamp(1.6rem, 2.6vw, 3rem);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .stage__picture.is-entering svg { animation: none; }
+  .stage__picture.is-entering svg,
+  .stage__picture.is-entering .stage__photo { animation: none; }
+  .bar__button--mic.is-listening { animation: none; }
   .tile { transition: none; }
 }

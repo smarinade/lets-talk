@@ -193,11 +193,30 @@
     <circle cx="100" cy="80" r="10" fill="${TEAL}"/>
     <circle cx="130" cy="80" r="10" fill="${TEAL}"/>`);
 
+  const mic = svg(`
+    <rect x="74" y="22" width="52" height="94" rx="26" fill="${TEAL}" ${LINE}/>
+    <path d="M52 92 Q52 142 100 142 Q148 142 148 92" fill="none" ${LINE} stroke-width="8"/>
+    <path d="M100 142 L100 172 M70 176 L130 176" fill="none" ${LINE} stroke-width="8"/>
+    <g fill="none" stroke="${ORANGE}" stroke-width="6" stroke-linecap="round">
+      <path d="M28 60 Q18 80 28 100"/>
+      <path d="M172 60 Q182 80 172 100"/>
+    </g>`);
+
+  const plus = svg(`
+    <circle cx="100" cy="100" r="80" fill="${WHITE}" ${LINE} stroke-dasharray="14 12"/>
+    <path d="M100 60 L100 140 M60 100 L140 100" fill="none" stroke="${TEAL}" stroke-width="16" stroke-linecap="round"/>`);
+
   window.LetsTalk = Object.freeze({
     ...(window.LetsTalk || {}),
+    // Bouwstenen voor drawings-answers.js, zodat alle tekeningen dezelfde stijl houden.
+    DRAWING_KIT: Object.freeze({
+      svg,
+      LINE,
+      COLORS: Object.freeze({ INK, SKIN, TEAL, ORANGE, YELLOW, RED, GREEN, GREY, WHITE, BROWN }),
+    }),
     DRAWINGS: Object.freeze({
       hand, smiley, plate, gym, cup, bed, bandage, walk,
-      house, weather, tv, heart, yes, no, unknown, bubble,
+      house, weather, tv, heart, yes, no, unknown, bubble, mic, plus,
     }),
   });
 })();
